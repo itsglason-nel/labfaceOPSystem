@@ -61,9 +61,9 @@ No existing AI agent instruction files (`AGENTS.md`, `CLAUDE.md`, or `.cursorrul
 - Mutations are queued via `OfflineQueueService` (IndexedDB).
 - **Critical Flaw**: Because the Database and Backend API run on the exact same local PC as the CCTV AI service, a power outage in the classroom takes the entire website offline. The frontend cache cannot serve schedule or historical data if the user refreshes.
 
-**Proposed Solution: Cloud-Hybrid Architecture**
-To achieve high availability while keeping the heavy video processing local, the system must be split:
-1. **Cloud Web Layer (24/7 Uptime)**: Migrate the Next.js Frontend, Node.js Backend, MariaDB, and MinIO storage to cloud providers (e.g., Vercel, Render, AWS). This ensures that students and professors can log in, view analytics, and manage profiles from anywhere, at any time, regardless of the classroom PC's status.
+**Proposed Solution: Zero-Cost Cloud-Hybrid Architecture**
+To achieve high availability while keeping the heavy video processing local (and keeping server costs at $0), the system must be split using free-tier providers:
+1. **Cloud Web Layer (24/7 Uptime, Free)**: Migrate the Next.js Frontend to **Vercel**, the Node.js Backend to **Render** or **Koyeb**, the MariaDB to **Aiven's free tier**, and MinIO storage to **Cloudflare R2**. This ensures that students and professors can log in and view analytics from anywhere, at any time, regardless of the classroom PC's status, with zero recurring costs.
 2. **Local Edge Node (AI Service)**: Keep the Python FastAPI `ai-service` running on the physical classroom PC. This node pulls the RTSP camera feed locally (saving massive bandwidth costs) and POSTs lightweight recognition hits up to the Cloud Backend.
 3. **Graceful Degradation**: Update the `SessionModal.tsx` in the frontend so that when a professor attempts to start a class, it checks the health of the local AI node (either directly or via a cloud proxy). If the classroom PC is down, the frontend remains fully usable but disables the "Start Live CCTV Session" button, falling back to manual attendance.
 
@@ -87,5 +87,284 @@ To achieve high availability while keeping the heavy video processing local, the
 
 ## Appendix: Full Recursive File Tree
 ```
-$(tree -I "node_modules|venv|.git|__pycache__|.next|build|dist|.last_build")
+.
+├── AGENTS.md
+├── AUDIT_REPORT.md
+├── CLOUD_MIGRATION_GUIDE.md
+├── PRODUCTION_MIGRATION.md
+├── ai-service
+│   ├── Dockerfile
+│   ├── ai-base.Dockerfile
+│   ├── core
+│   │   ├── attendance_logic.py
+│   │   ├── face_enhancer.py
+│   │   ├── face_recognition.py
+│   │   └── face_tracker.py
+│   ├── download_models.py
+│   ├── fetch_models.sh
+│   ├── main.py
+│   ├── models
+│   │   ├── active_liveness.py
+│   │   ├── depth_liveness.py
+│   │   ├── facenet_mobile.py
+│   │   └── passive_liveness.py
+│   ├── pyrightconfig.json
+│   ├── requirements.txt
+│   ├── routes
+│   │   └── face_routes.py
+│   ├── services
+│   │   ├── chatbot.py
+│   │   └── predictive_analytics.py
+│   └── utils
+│       ├── cache.py
+│       └── error_handler.py
+├── backend
+│   ├── Dockerfile
+│   ├── apply_batch_updates.js
+│   ├── config
+│   │   ├── db.js
+│   │   └── holidays.js
+│   ├── eng.traineddata
+│   ├── index.js
+│   ├── init.sql
+│   ├── middleware
+│   │   ├── auth.js
+│   │   ├── errorHandler.js
+│   │   ├── inputValidation.js
+│   │   └── securityMiddleware.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── routes
+│   │   ├── adminRoutes.js
+│   │   ├── aiRoutes.js
+│   │   ├── analyticsRoutes.js
+│   │   ├── attendanceRoutes.js
+│   │   ├── attendanceWarningRoutes.js
+│   │   ├── authRoutes.js
+│   │   ├── classRoutes.js
+│   │   ├── consentRoutes.js
+│   │   ├── dataRightsRoutes.js
+│   │   ├── groupRoutes.js
+│   │   ├── notificationRoutes.js
+│   │   ├── publicRoutes.js
+│   │   ├── studentRoutes.js
+│   │   └── userRoutes.js
+│   ├── scratch_audit.js
+│   ├── scripts
+│   │   ├── recover_biometrics.js
+│   │   └── sync_user_periods.js
+│   ├── seed_analytics.js
+│   ├── services
+│   │   ├── aiService.js
+│   │   ├── analyticsService.js
+│   │   ├── attendanceWarningService.js
+│   │   ├── monitoringService.js
+│   │   ├── ocrService.js
+│   │   ├── reportingService.js
+│   │   ├── test_ocr_logic.js
+│   │   └── verificationService.js
+│   └── utils
+│       ├── emailService.js
+│       ├── faceValidation.js
+│       ├── minioHelper.js
+│       ├── notificationHelper.js
+│       └── passwordValidator.js
+├── backups
+│   └── heritage_ui_backup
+│       ├── app
+│       │   ├── login
+│       │   │   └── page.tsx
+│       │   ├── page.tsx
+│       │   └── register
+│       │       ├── professor
+│       │       │   └── page.tsx
+│       │       └── student
+│       │           └── page.tsx
+│       ├── globals.css
+│       └── tailwind.config.ts
+├── brain
+│   └── check_time.js
+├── deploy.sh
+├── docker-compose.dev.yml
+├── docker-compose.local-ai.yml
+├── docker-compose.yml
+├── frontend
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── app
+│   │   ├── Providers.tsx
+│   │   ├── admin
+│   │   │   ├── ai-analytics
+│   │   │   │   └── page.tsx
+│   │   │   ├── analytics
+│   │   │   │   └── page.tsx
+│   │   │   ├── camera-test
+│   │   │   │   └── page.tsx
+│   │   │   ├── dashboard
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   ├── login
+│   │   │   │   └── page.tsx
+│   │   │   └── profile
+│   │   │       ├── layout.tsx
+│   │   │       └── page.tsx
+│   │   ├── forgot-password
+│   │   │   └── page.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── not-found.tsx
+│   │   ├── notifications
+│   │   │   └── page.tsx
+│   │   ├── page.tsx
+│   │   ├── privacy-policy
+│   │   │   └── page.tsx
+│   │   ├── professor
+│   │   │   ├── ai-analytics
+│   │   │   │   └── page.tsx
+│   │   │   ├── camera-test
+│   │   │   │   └── page.tsx
+│   │   │   ├── dashboard
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── tabs
+│   │   │   │       ├── ActiveSessionPanel.tsx
+│   │   │   │       ├── AnalyticsTab.tsx
+│   │   │   │       ├── ClassesTab.tsx
+│   │   │   │       ├── HomeTab.tsx
+│   │   │   │       ├── MonitorTab.tsx
+│   │   │   │       └── ScheduleTab.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── profile
+│   │   │       ├── layout.tsx
+│   │   │       └── page.tsx
+│   │   ├── register
+│   │   │   ├── professor
+│   │   │   │   └── page.tsx
+│   │   │   └── student
+│   │   │       └── page.tsx
+│   │   └── student
+│   │       ├── ai-insights
+│   │       │   └── page.tsx
+│   │       ├── classes
+│   │       │   └── [id]
+│   │       │       └── page.tsx
+│   │       ├── dashboard
+│   │       │   ├── page.tsx
+│   │       │   └── tabs
+│   │       │       ├── AnalyticsTab.tsx
+│   │       │       ├── AttendanceTab.tsx
+│   │       │       ├── ClassesTab.tsx
+│   │       │       ├── HomeTab.tsx
+│   │       │       └── ScheduleTab.tsx
+│   │       ├── layout.tsx
+│   │       └── profile
+│   │           ├── layout.tsx
+│   │           └── page.tsx
+│   ├── apply_footer_and_jargon.py
+│   ├── check_braces.py
+│   ├── components
+│   │   ├── AcademicSettingsTab.tsx
+│   │   ├── AcademicUpdateBanner.tsx
+│   │   ├── AttendanceInsights.tsx
+│   │   ├── AttendanceInsightsSkeleton.tsx
+│   │   ├── AuthGuard.tsx
+│   │   ├── Breadcrumbs.tsx
+│   │   ├── BulkActions.tsx
+│   │   ├── CancelSessionModal.tsx
+│   │   ├── ClassAnalytics.tsx
+│   │   ├── ClassDetailsModal.tsx
+│   │   ├── ConditionalFooter.tsx
+│   │   ├── ConfirmModal.tsx
+│   │   ├── ConsentGuard.tsx
+│   │   ├── ConsentStep.tsx
+│   │   ├── CreateClassModal.tsx
+│   │   ├── CreateProfessorModal.tsx
+│   │   ├── DataPrivacyConsent.tsx
+│   │   ├── DeletionRequestsTab.tsx
+│   │   ├── DeveloperCredits.tsx
+│   │   ├── EditClassModal.tsx
+│   │   ├── FaceEnrollmentScanner.tsx
+│   │   ├── FaceReScan.tsx
+│   │   ├── IdentityBackground.tsx
+│   │   ├── IdentityFooter.tsx
+│   │   ├── LiveCCTVPreview.tsx
+│   │   ├── LivenessCapture.tsx
+│   │   ├── Navbar.tsx
+│   │   ├── NotificationCenter.tsx
+│   │   ├── Personalization.tsx
+│   │   ├── SessionModal.tsx
+│   │   ├── SessionTimeout.tsx
+│   │   ├── SmartSearch.tsx
+│   │   ├── StudentBatchModal.tsx
+│   │   ├── TermsAndConditions.tsx
+│   │   ├── ThemeProvider.tsx
+│   │   ├── ThemeToggle.tsx
+│   │   ├── Toast.tsx
+│   │   ├── UpdateManager.tsx
+│   │   ├── VideoFeed.tsx
+│   │   ├── charts
+│   │   │   └── AttendanceChart.tsx
+│   │   ├── modals
+│   │   │   └── IdentityTheftModal.tsx
+│   │   └── ui
+│   │       ├── BackButton.tsx
+│   │       ├── Breadcrumbs.tsx
+│   │       ├── Button.tsx
+│   │       ├── DashboardTabs.tsx
+│   │       ├── EmptyState.tsx
+│   │       ├── InputField.tsx
+│   │       └── Skeleton.tsx
+│   ├── context
+│   │   └── NavigationContext.tsx
+│   ├── execute_final_jargon_fixes.py
+│   ├── extract_jargon.py
+│   ├── extract_remaining_jargon.py
+│   ├── final_clean.py
+│   ├── fix_all_jargon.py
+│   ├── fix_buttons.py
+│   ├── hooks
+│   │   └── useConsent.ts
+│   ├── jargon.json
+│   ├── jargon_report.txt
+│   ├── lib
+│   │   ├── background-removal.ts
+│   │   └── offline.ts
+│   ├── next.config.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── public
+│   │   ├── feedback-qr.png
+│   │   ├── logo.png
+│   │   ├── offline.html
+│   │   ├── output.css
+│   │   ├── pup-pylon-day.jpg
+│   │   ├── pup-pylon-night.jpg
+│   │   ├── sw.js
+│   │   └── version.txt
+│   ├── remaining_jargon.json
+│   ├── restrict_footer_further.py
+│   ├── revert_labels.py
+│   ├── services
+│   │   ├── offlineQueueService.ts
+│   │   └── syncManager.ts
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   └── utils
+│       ├── auth.ts
+│       ├── holidays.ts
+│       ├── offlineDB.ts
+│       └── version.ts
+├── full_tree.txt
+├── local-only.sh
+├── nginx
+│   ├── Dockerfile
+│   └── nginx.conf
+├── pyrightconfig.json
+└── walkthrough_v3.md
+
+62 directories, 215 files
+
 ```
