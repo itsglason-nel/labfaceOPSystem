@@ -14,17 +14,22 @@ LabFace is a multi-tier, AI-powered Face Recognition Attendance System.
 - `/ai-service/`: Python FastAPI. `core/` contains CV logic, `models/` contains ML implementations.
 - **Docker**: `docker-compose.yml` models a single-machine local/production deployment. This machine represents a single point of failure.
 
-## Offline / Server Downtime Considerations
-- If `ai-service` is unreachable (Scenario A), the Next.js frontend and Node backend can still function, but live CCTV feeds and new attendance matching will fail.
-- If the entire stack goes down (Scenario B), the `frontend` relies on a Service Worker (`sw.js`) and IndexedDB (`frontend/utils/offlineDB.ts`) to serve basic cached UI and queue operations (like profiles updates). *It does not currently support offline-read caching for schedule viewing.*
+## Deployment & Architecture Target
+LabFace is transitioning from a monolithic single-node deployment to a **Cloud-Hybrid Edge Architecture**:
+- **Cloud Layer**: Next.js (Frontend), Node.js (Backend), MariaDB, and Cloud Object Storage. These must have 24/7 uptime.
+- **Edge Layer**: Python FastAPI (`ai-service`). Runs on physical PCs in the classroom to process RTSP feeds locally.
+
+### Offline / Edge Downtime Considerations
+- If the local edge node (`ai-service` PC) is unreachable, the web platform **must remain online**.
+- The frontend should proactively query the edge node's health (or the backend's registry of edge nodes) and gracefully disable CCTV-dependent features (like starting a live attendance session), while allowing users to browse their history and analytics.
 
 ## Setup & Run Commands
-1. **Local deployment**:
-   `./local-only.sh` (wraps docker compose with fast builds and NGINX tunneling).
-2. **Production deployment**:
-   `./deploy.sh` (supports smart rebuilds and stable build IDs).
-3. **Database Reset**:
-   `docker exec -i labface_mariadb_1 mysql -uroot -p<password> labface < backend/init.sql`
+1. **Full Local Dev**:
+   `./local-only.sh` (Spins up everything locally via `docker-compose.yml`).
+2. **Production Cloud Deploy**:
+   `./deploy.sh` (Use for deploying the web/API layer to a VPS or cloud provider).
+3. **Edge Node Deploy (Classroom PC)**:
+   Use `docker-compose.local-ai.yml` to spin up just the CCTV ingestion layer.
 
 ## Coding Conventions
 - **Frontend**: Functional components, Tailwind for styling, `lucide-react` for icons. Break up large files (avoid the "god file" anti-pattern). Note: Currently missing `<meta name="viewport">` in root layout.

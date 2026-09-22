@@ -1,0 +1,47 @@
+version: '3.8'
+
+# -----------------------------------------------------------------------------
+# HYBRID EDGE DEPLOYMENT
+# Run this file ONLY on the physical PC located in the classroom.
+# -----------------------------------------------------------------------------
+
+services:
+  # Cloudflare Tunnel (Optional, but highly recommended)
+  # Allows your cloud backend to send signals down to the local AI service
+  # without exposing the local PC to the public internet via port forwarding.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    network_mode: "host"
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    environment:
+      # In the hybrid model, the AI service talks to the CLOUD backend
+      - BACKEND_URL=${CLOUD_BACKEND_URL}
+      - API_SECRET_KEY=${AI_NODE_SECRET} # Secure communication with cloud
+      - RTSP_URL_1=${RTSP_URL_1}
+      - TZ=Asia/Manila
+    volumes:
+      - ./ai-service/models:/app/models
+      - ./ai-service/models/weights:/app/gfpgan/weights
+      - ./ai-service/.cache/pip:/app/.cache/pip
+      - ai_models:/root/.insightface
+      - gfpgan_weights:/usr/local/lib/python3.10/site-packages/gfpgan/weights
+      - gfpgan_weights_app:/app/gfpgan/weights
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  ai_models:
+    driver: local
+  gfpgan_weights:
+    driver: local
+  gfpgan_weights_app:
+    driver: local

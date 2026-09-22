@@ -59,29 +59,16 @@ No existing AI agent instruction files (`AGENTS.md`, `CLAUDE.md`, or `.cursorrul
 **Current Behavior**:
 - The Next.js frontend has a service worker (`sw.js`) that precaches core assets and shows an `offline.html` page when offline.
 - Mutations are queued via `OfflineQueueService` (IndexedDB).
-- If the entire stack goes down, the user cannot view cached dashboard data or class schedules.
-- `SessionModal.tsx` attempts to start a class by immediately firing a `POST` request. If offline, the UI provides poor feedback or hangs indefinitely.
+- **Critical Flaw**: Because the Database and Backend API run on the exact same local PC as the CCTV AI service, a power outage in the classroom takes the entire website offline. The frontend cache cannot serve schedule or historical data if the user refreshes.
 
-**Proposal & Implementation Options**:
-To meet the offline resilience requirement, we must cache data when the system is online, and actively block new session creation when offline.
+**Proposed Solution: Cloud-Hybrid Architecture**
+To achieve high availability while keeping the heavy video processing local, the system must be split:
+1. **Cloud Web Layer (24/7 Uptime)**: Migrate the Next.js Frontend, Node.js Backend, MariaDB, and MinIO storage to cloud providers (e.g., Vercel, Render, AWS). This ensures that students and professors can log in, view analytics, and manage profiles from anywhere, at any time, regardless of the classroom PC's status.
+2. **Local Edge Node (AI Service)**: Keep the Python FastAPI `ai-service` running on the physical classroom PC. This node pulls the RTSP camera feed locally (saving massive bandwidth costs) and POSTs lightweight recognition hits up to the Cloud Backend.
+3. **Graceful Degradation**: Update the `SessionModal.tsx` in the frontend so that when a professor attempts to start a class, it checks the health of the local AI node (either directly or via a cloud proxy). If the classroom PC is down, the frontend remains fully usable but disables the "Start Live CCTV Session" button, falling back to manual attendance.
 
-**Option 1: IndexedDB via idb-keyval or Dexie (Recommended)**
-- **Pros**: Asynchronous, handles large JSON payloads (like schedules/attendance arrays) well, integrated well with Service Workers.
-- **Cons**: Slightly more complex API than localStorage; requires careful version management.
+*(A detailed step-by-step migration path is now available in `CLOUD_MIGRATION_GUIDE.md` and a specific edge-deployment file `docker-compose.local-ai.yml` has been created).*
 
-**Option 2: React Query / SWR with Persist Cache**
-- **Pros**: Built-in stale-while-revalidate logic; handles the state management naturally inside the React component tree.
-- **Cons**: Large caches can slow down initial rehydration; still relies on underlying Web Storage (often LocalStorage) unless explicitly configured for IDB.
-
-**Option 3: Local SQLite Cache (via WASM or local node)**
-- **Pros**: Full SQL querying capability on the client, great for complex schedule filtering offline.
-- **Cons**: Heavy initial payload (WASM binaries), massive overkill for simple read-only views.
-
-**Option 4: Edge Device Cache**
-- **Pros**: Centralized caching at the network level (if a local edge router exists).
-- **Cons**: Does not solve the scenario where the client's own device loses Wi-Fi connection entirely.
-
-*Regardless of the cache choice, `SessionModal.tsx` must be updated to wrap the Start Session button with a network check (`!navigator.onLine`) AND a backend health ping (`/api/health`). If either fails, disable the Start Session button and overlay a tooltip: "Live monitoring is unavailable because the CCTV server is offline."*
 ## 7. Mobile UI Audit Findings
 
 1. **CRITICAL: Missing Viewport Tag**. The Next.js `app/layout.tsx` is missing `<meta name="viewport" content="width=device-width, initial-scale=1" />`. This breaks all Tailwind responsive scaling on mobile devices. (Line 1 of `layout.tsx`).
