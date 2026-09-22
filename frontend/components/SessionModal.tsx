@@ -33,6 +33,7 @@ export default function SessionModal({ isOpen, onClose, classId, className, onSu
     const [type, setType] = useState('regular'); // regular, makeup, batch
     const [loading, setLoading] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
+    const [edgeNodeHealth, setEdgeNodeHealth] = useState<boolean>(true);
 
     // Form State
     const now = new Date();
@@ -308,6 +309,30 @@ export default function SessionModal({ isOpen, onClose, classId, className, onSu
         
         return matchesSearch;
     });
+
+
+    // Check if the edge node (AI service / backend) is reachable
+    useEffect(() => {
+        const checkEdgeNodeHealth = async () => {
+            if (!navigator.onLine) {
+                setEdgeNodeHealth(false);
+                return;
+            }
+            try {
+                const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+                // Fast timeout to avoid hanging the UI
+                await axios.get(`${API_URL}/api/health`, { timeout: 3000 });
+                setEdgeNodeHealth(true);
+            } catch (error) {
+                console.warn('Edge node health check failed:', error);
+                setEdgeNodeHealth(false);
+            }
+        };
+
+        checkEdgeNodeHealth();
+        const interval = setInterval(checkEdgeNodeHealth, 15000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleStartSession = async () => {
         setLoading(true);
@@ -1223,6 +1248,19 @@ export default function SessionModal({ isOpen, onClose, classId, className, onSu
                     </div>
                 )}
 
+
+                {/* Offline Warning */}
+                {!edgeNodeHealth && (
+                    <div className="mb-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-center animate-pulse">
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">
+                            ⚠️ Live Session Unavailable
+                        </p>
+                        <p className="text-xs text-rose-400 mt-1">
+                            The classroom CCTV edge node is currently offline. You cannot start a live session at this time.
+                        </p>
+                    </div>
+                )}
+
                 {/* Start Button */}
                 <button
                     onClick={handleStartSession}
@@ -1230,7 +1268,10 @@ export default function SessionModal({ isOpen, onClose, classId, className, onSu
                         loading ||
                         fetchingStatus ||
                         isRedirecting ||
+                        !edgeNodeHealth ||
                         (type === 'batch' && (scheduledBatches.length === 0 || !isBatchStartAllowed())) ||
+                        (type === 'regular' && !isRegularAllowed())
+                    }
                         (type === 'regular' && !isRegularAllowed())
                     }
                     className="w-full bg-identity-navy text-white font-black uppercase tracking-[0.15em] py-5 rounded-xl transition-all shadow-lg shadow-identity-navy/20 flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden active:scale-95"
